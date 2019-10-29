@@ -1,7 +1,7 @@
 from bs4 import BeautifulSoup
 import requests
 
-with open('wangyi.html', 'r', encoding='utf-8') as f:
+with open('abcd.html', 'r', encoding='utf-8') as f:
     html = f.read()
 soup = BeautifulSoup(html, 'lxml')
 res_list = soup.find_all(class_="data_row news_article clearfix")
