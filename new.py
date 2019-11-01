@@ -1,9 +1,8 @@
 from bs4 import BeautifulSoup
 import requests
 
-url = 'https://news.163.com/19/1025/16/ESBJM4AE0001875O.html'
+
+url = 'http://47.94.140.188:18035/#/article/create_article'
 res = requests.get(url)
-print(type(res.text))
-'''soup = BeautifulSoup(res, 'lxml')'''
 with open('new.html', 'w', encoding='utf8') as f:
     f.write(res.text)

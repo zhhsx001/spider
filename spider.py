@@ -1,17 +1,22 @@
+import base64
+from io import BytesIO
 import requests
 from selenium import webdriver
+from PIL import Image
 from bs4 import BeautifulSoup
 import pandas as pd
 
 
 url = 'https://news.163.com/'
-aim = ['wangyi.html', 'domestic.html', 'world.html', 'tech.html', 'jiankang.html']
+aim = ['abcd.html', 'domestic.html', 'world.html', 'tech.html', 'jiankang.html']
+token_url = 'http://admin.kingmasports.com/admapi/v1/store/qiniu/uploadToken?upMode=base64&uid=9'
+post_url = "https://upload-z1.qiniup.com/putb64/-1/key/"
 
 
 def home_spider(url_, file_name):
     browser = webdriver.Chrome()
     try:
-        browser.get(url)
+        browser.get(url_)
         home_soup = BeautifulSoup(browser.page_source, 'lxml')
         article_list = home_soup.find_all(class_="data_row news_article clearfix")
         string = pd.DataFrame(columns=['url', 'title', 'img', 'time', 'keywords'])
@@ -29,55 +34,123 @@ def home_spider(url_, file_name):
                 for a in keywords.find_all('a'):
                     article_keywords += ' ' + a.string
 
-            except Exception as e:
+            except:
                 continue
             one_title['keywords'] = keywords
             string = string.append(one_title, ignore_index=True)
 
-        string.to_csv('wangyi.csv')
+        string.to_csv('%s.csv' % file_name, encoding='utf8')
     finally:
         browser.close()
 
 
-def html_spider(url_):
-    result = requests.get(url_)
-    with open('new.html', 'w', encoding='utf8') as f:
-        f.write(result.text)
+def big_and_small_spilt():
+    choices = pd.read_csv('choices.csv', index_col=0, header=None)
+    data = pd.read_csv('df_test.csv', index_col=0)
+    for url_id in choices[1]:
+        url_ = data.loc[url_id, 'url']
+        html_spider(url_id, url_)
 
 
-def page_analysis(html):
-    pass
+def html_spider(url_id, url_):
+    # 根据选取的列表，爬取对应的new，根据有大图，无大图分成两组存储。
+    request = requests.get(url_)
+    soup = BeautifulSoup(request.text, 'lxml')
+    text = soup.body.find(class_="post_content post_area clearfix").find(id="epContentLeft").find(class_="post_body").\
+        find(id="endText")
+
+    mark = 'small'
+    for tap in text:
+        if tap:
+            for t in tap:
+                try:
+                    if t.name == 'img':
+                        mark = 'big'
+                except:
+                    pass
+        if mark == 'big':
+            break
+
+    with open('new/%s/%d.html' % (mark, url_id), 'w', encoding='utf8') as f:
+        f.write(request.text)
 
 
-def save_file():
-    pass
+def picture_post(picture_url):
+    token_header = {'accept':'application/json, text/plain, */*',
+        'accept-Encoding':'gzip, deflate',
+        'accept-Language':'zh-CN,zh;q=0.9',
+        'authorization':'c267a03c4d9247d0b2fc3c2ff206ffeb',
+        'connection':'keep-alive',
+        'host':'admin.kingmasports.com',
+        'referer':'http://admin.kingmasports.com/',
+        'user-Agent':'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/78.0.3904.87 Safari/537.36'
+        }
+    token = requests.get(token_url, headers=token_header)
+    encode_key = token.json()['data']['encodedKey']
+    up_token = token.json()['data']['token']
+
+    post_headers = {
+        'accept': "application/json, text/plain, */*",
+        'accept-encoding': "gzip, deflate, br",
+        'accept-language': "zh-CN,zh;q=0.9",
+        'authorization': 'UpToken ' + up_token,
+        # 'content-length': "43644",
+        'content-type': "application/octet-stream",
+        'origin': "http://admin.kingmasports.com",
+        'referer': "http://admin.kingmasports.com/",
+        'sec-fetch-mode': "cors",
+        'sec-fetch-site': "cross-site",
+        'user-agent': "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/78.0.3904.87 Safari/537.36",
+        'cache-control': "no-cache",
+        'postman-token': "d037b4e3-5cd4-f506-ac21-37539c7d5ce0"
+    }
+
+    post_u = post_url + encode_key
+
+    requests.options(post_u, headers=post_headers)
+    img = Image.open(picture_url)
+    output_buffer = BytesIO()
+    img.save(output_buffer, format='JPEG')
+    byte_data = output_buffer.getvalue()
+    base64_str = base64.b64encode(byte_data)
+    response = requests.post(post_u, headers=post_headers, data=base64_str)
+    picture_id = response.json()['key']
+    return picture_id
+    #或者上传所有文字后，根据标题选择对应的图片上传。selenium
 
 
-def content():
-    # 根据选取返回的列表，将对应页面下载，分成大小图两个文件夹。
-    pass
+def create_article(title, image_url, botton=False, content='', video=None):
+    article = {"articleId": 0,
+                      "title": title,
+                      "subTitle": "",
+                      "weight": 0,
+                      "categoryId": 1,
+                      "orgId": "",
+                      "articleImages": [image_url],
+                      "jumbotron":botton,
+                      "articleBannerImages": [],
+                      "video": video,
+                      "publish": None,
+                      "editorData": content}
+
+    headers = {
+        'Host': '47.94.140.188:18035',
+        'Connection': 'keep-alive',
+        'Content-Length': '219',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/78.0.3904.70 Safari/537.36',
+        'Cache-Control': 'no-cache',
+        'Origin': 'chrome-extension://fhbjgbiflinjbdggehcddcbncdddomop',
+        'Postman-Token': 'a8b56315-fa55-dcbb-59e6-e9fd2dff4e44',
+        'Content-Type': 'application/json',
+        'Accept': '*/*',
+        'Accept-Encoding': 'gzip, deflate',
+        'Accept-Language': 'zh-CN,zh;q=0.9',
+    }
+
+    create_url = 'http://47.94.140.188:18035//admapi/v1/article/article?uid=9'
+
+    r = requests.post(create_url, headers=headers, json=article)
 
 
-def text_report():
-    pass
-
-
-with open('html/tech.html', 'r') as f:
-    s = BeautifulSoup(f, 'lxml')
-    text = s.get_text()
-    x = s.body
-
-
-with open('wangyi.html', 'r', encoding='utf-8') as f:
-    html = f.read()
-soup = BeautifulSoup(html, 'lxml')
-res_list = soup.find_all(class_="data_row news_article clearfix news_first")
-res = res_list[0]
-print('a: ', res.a['href'])
-print('标题：', res.h3.string)
-print('小图: ', res.img['src'])
-'''for r in res:
-    # 标题
-
-    # url
-    # 小图'''
+if __name__ == "__main__":
+    print(picture_post('new/small/lizi.jpeg'))

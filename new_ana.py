@@ -5,7 +5,7 @@ soup = BeautifulSoup(html, 'lxml')
 h1 = soup.find('h1')
 print(h1)
 x = soup.body.find(class_="post_content post_area clearfix")
-#print(x)
+# print(x)
 y = x.find(id="epContentLeft")
 
 y = y.find(class_="post_body")

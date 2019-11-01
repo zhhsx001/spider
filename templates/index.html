@@ -6,19 +6,32 @@
     <style>
         body{</te>xt-align:center}
     </style>
+
+    <style type="text/css">
+    a:link {
+    color:#3C3C3C;
+    text-decoration:underline;
+    }
+    a:visited {
+    color:#0000FF;
+    text-decoration:none;
+    }
+    </style>
 </head>
 <body>
-<form method="post" action="/complete" style="display:block;margin:0 auto">
-{% for key,value in tables.iterrows() %}
-    <li style="display:block;margin:15px auto">
-    <label>
-        <input name="{{ key }}"  type="checkbox">
-        {{ key }} {{ value['title'] }} <a href="{{ value['url'] }}" >新闻内容</a>
-        </input>
-    </label>
-    </li>
-{% endfor %}
-    <button type="submit" style="display:block;margin:0 auto"> 提交 </button>
+<div style="width:100%;text-align:center">
+    <form class="divForm" method="post" action="/complete" style="align:left">
+        {% for key,value in tables.iterrows() %}
+            <li style="display:block;margin:15px auto">
+            <label>
+                <input name="{{ key }}"  type="checkbox">
+                {{ key }} {{ value['title'] }} <a href="{{ value['url'] }}" >新闻内容</a>
+                </input>
+            </label>
+            </li>
+        {% endfor %}
+        <button type="submit" style="display:block;margin:0 auto"> 提交 </button>
     </form>
+    </div>
 </body>
 </html>
