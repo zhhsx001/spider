@@ -1,4 +1,6 @@
 import base64
+import os
+import shutil
 from io import BytesIO
 import requests
 from selenium import webdriver
@@ -33,8 +35,7 @@ def home_spider(url_, file_name):
             try:
                 for a in keywords.find_all('a'):
                     article_keywords += ' ' + a.string
-
-            except:
+            except None:
                 continue
             one_title['keywords'] = keywords
             string = string.append(one_title, ignore_index=True)
@@ -42,6 +43,11 @@ def home_spider(url_, file_name):
         string.to_csv('%s.csv' % file_name, encoding='utf8')
     finally:
         browser.close()
+
+    shutil.rmtree('new/big')
+    os.mkdir('new/big')
+    shutil.rmtree('new/small')
+    os.mkdir('new/small')
 
 
 def big_and_small_spilt():
@@ -60,22 +66,23 @@ def html_spider(url_id, url_):
         find(id="endText")
 
     mark = 'small'
-    for tap in text:
-        if tap:
-            for t in tap:
-                try:
-                    if t.name == 'img':
-                        mark = 'big'
-                except:
-                    pass
-        if mark == 'big':
-            break
+    tap = text.find(class_='ep-source cDGray')
+    tap.extract()
+    img = text.img
+    if img:
+        mark = 'big'
 
     with open('new/%s/%d.html' % (mark, url_id), 'w', encoding='utf8') as f:
         f.write(request.text)
 
 
-def picture_post(picture_url):
+def picture_post(picture_url, img_kind):
+    if img_kind == 'png':
+        img_kind = 'PNG'
+    elif img_kind == 'gif':
+        img_kind = 'gif'
+    else:
+        img_kind = 'JPEG'
     token_header = {'accept':'application/json, text/plain, */*',
         'accept-Encoding':'gzip, deflate',
         'accept-Language':'zh-CN,zh;q=0.9',
@@ -83,7 +90,8 @@ def picture_post(picture_url):
         'connection':'keep-alive',
         'host':'admin.kingmasports.com',
         'referer':'http://admin.kingmasports.com/',
-        'user-Agent':'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/78.0.3904.87 Safari/537.36'
+        'user-Agent':'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko)'
+                     ' Chrome/78.0.3904.87 Safari/537.36'
         }
     token = requests.get(token_url, headers=token_header)
     encode_key = token.json()['data']['encodedKey']
@@ -104,53 +112,62 @@ def picture_post(picture_url):
         'cache-control': "no-cache",
         'postman-token': "d037b4e3-5cd4-f506-ac21-37539c7d5ce0"
     }
-
     post_u = post_url + encode_key
 
     requests.options(post_u, headers=post_headers)
+
     img = Image.open(picture_url)
     output_buffer = BytesIO()
-    img.save(output_buffer, format='JPEG')
+    img.save(output_buffer, format=img_kind)
     byte_data = output_buffer.getvalue()
     base64_str = base64.b64encode(byte_data)
     response = requests.post(post_u, headers=post_headers, data=base64_str)
+
+    print('---post picture:')
+    print(response.status_code)
+    print(response.text)
     picture_id = response.json()['key']
     return picture_id
-    #或者上传所有文字后，根据标题选择对应的图片上传。selenium
+    # 或者上传所有文字后，根据标题选择对应的图片上传。selenium
 
 
-def create_article(title, image_url, botton=False, content='', video=None):
+def create_article(title, image_url=[], button=False, content='', video=''):
     article = {"articleId": 0,
                       "title": title,
                       "subTitle": "",
                       "weight": 0,
                       "categoryId": 1,
                       "orgId": "",
-                      "articleImages": [image_url],
-                      "jumbotron":botton,
+                      "articleImages": image_url,
+                      "jumbotron": button,
                       "articleBannerImages": [],
                       "video": video,
                       "publish": None,
                       "editorData": content}
 
     headers = {
-        'Host': '47.94.140.188:18035',
-        'Connection': 'keep-alive',
-        'Content-Length': '219',
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/78.0.3904.70 Safari/537.36',
-        'Cache-Control': 'no-cache',
-        'Origin': 'chrome-extension://fhbjgbiflinjbdggehcddcbncdddomop',
-        'Postman-Token': 'a8b56315-fa55-dcbb-59e6-e9fd2dff4e44',
-        'Content-Type': 'application/json',
-        'Accept': '*/*',
-        'Accept-Encoding': 'gzip, deflate',
-        'Accept-Language': 'zh-CN,zh;q=0.9',
+        'accept': "application/json, text/plain, */*",
+        'accept-encoding': "gzip, deflate",
+        'accept-language': "zh-CN,zh;q=0.9",
+        'authorization': "c267a03c4d9247d0b2fc3c2ff206ffeb",
+        'connection': "keep-alive",
+        'content-type': "application/json",
+        'host': "admin.kingmasports.com",
+        'origin': "http://admin.kingmasports.com",
+        'referer': "http://admin.kingmasports.com/",
+        'user-agent': "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) "
+                      "Chrome/78.0.3904.87 Safari/537.36",
+        'cache-control': "no-cache",
+        'postman-token': "92df53b3-ab03-a1b3-66bb-3845f33d1871"
     }
 
-    create_url = 'http://47.94.140.188:18035//admapi/v1/article/article?uid=9'
+    create_url = 'http://admin.kingmasports.com/admapi/v1/article/article?uid=9'
 
     r = requests.post(create_url, headers=headers, json=article)
+    print('create article')
+    print(r.status_code)
+    print(r.text)
 
 
 if __name__ == "__main__":
-    print(picture_post('new/small/lizi.jpeg'))
+    pass
