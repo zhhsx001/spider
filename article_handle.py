@@ -10,8 +10,7 @@ class Article(object):
         self.id = file_id
         self.kind = kind
         self.html = BeautifulSoup(html, 'lxml')
-        self.content = self.html.body.find(class_="post_content post_area clearfix").find(id="epContentLeft").\
-            find(class_="post_body").find(id="endText")
+        self.content = self.html.find(id="endText")
 
     def content_kind(self):
         # 不显示图集类型文章。短文字，加视频的文章如何？
@@ -20,8 +19,9 @@ class Article(object):
     def old_title(self):
         # 删除原标题
         tap = self.content.p
-        if tap.get('class')[0] == 'otitle':
-            tap.extract()
+        if tap.get('class'):
+            if tap.get('class')[0] == 'otitle':
+                tap.extract()
 
     def video(self):
         # 删除视频
@@ -37,7 +37,8 @@ class Article(object):
     def del_editor(self):
         # 删除文脚编辑，文章内容编辑。
         tap = self.content.find(class_='ep-source cDGray')
-        tap.extract()
+        if tap:
+            tap.extract()
 
     def add_editor(self):
         # 定位文章内容，删除页脚责编，增加诸黎。
@@ -45,8 +46,10 @@ class Article(object):
         p_list[-1].string = '编辑诸黎'
 
     def del_blank(self):
-        # 删除空行
-        pass
+        for p in self.content.find('p'):
+            if p:
+                if p.string is None:
+                    p.extract()
 
     def save_img(self):
         tap_img = self.content.img
@@ -56,8 +59,9 @@ class Article(object):
             with open('new/big/'+self.id+'p.'+img_url.split('.')[-1].split('?')[0], 'wb') as f:
                 f.write(img.content)
         else:
-            print(self.id)
+
             img_url = pd.read_csv('df_test.csv').iloc[int(self.id)]['img']
+
             img = requests.get(img_url)
             with open('new/small/'+self.id+'p.'+img_url.split('.')[-1].split('?')[0], 'wb') as f:
                 f.write(img.content)
@@ -74,6 +78,7 @@ class Article(object):
     def all_handle(self):
         # 所有处理，返回最终content图文结果
         self.old_title()
+        #   self.del_blank()
         self.video()
         self.del_link()
         self.del_editor()

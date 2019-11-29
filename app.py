@@ -20,56 +20,64 @@ def show_title():
 def accept_title():
     result = []
     for key in request.form.keys():
-        # print(key)
+
         result.append(key)
     result = pd.Series(result)
-    # print(result)
-    result.to_csv('choices.csv', header=None, encoding='utf8')
+
+    result.to_csv('choices.csv', header=False, encoding='utf8')
     return render_template('complete.html')
 
 
 @app.route('/report', methods=['GET', 'POST'])
 def report():
-
     spider.big_and_small_spilt()
     big_html = os.listdir('new/big')
     small_html = os.listdir('new/small')
     df = pd.read_csv('df_test.csv')
-    print('the last number: ', df.count()[0])
+
     for i in range(30):
+        try:
+            # 处理比例不平衡条件。
+            if i % 3 == 0 and big_html:
+                html_uri = big_html.pop()
+                img_uri = 'new/big/'+html_uri[:-5]+'p.'
+                button = True
+                html_uri = 'new/big/'+ html_uri
+            elif small_html:
+                html_uri = small_html.pop()
+                img_uri = 'new/small/'+html_uri[:-5]+'p.'
+                button = False
+                html_uri = 'new/small/'+html_uri
+            elif big_html:
+                html_uri = big_html.pop()
+                img_uri = 'new/big/'+html_uri[:-5]+'p.'
+                button = False
+                html_uri = 'new/big/'+ html_uri
 
-        # 处理比例不平衡条件。
-        if i % 3 == 0 and big_html:
-            html_uri = big_html.pop()
-            img_uri = 'new/big/'+html_uri[:-5]+'p.'
-            button = True
-            html_uri = 'new/big/'+ html_uri
-        elif small_html:
-            html_uri = small_html.pop()
-            img_uri = 'new/small/'+html_uri[:-5]+'p.'
-            button = False
-            html_uri = 'new/small/'+html_uri
-        #print(html_uri)
-        with open(html_uri, 'r', encoding='utf8') as f:
-            html_page = f.read()
-        print(html_uri)
-        article = article_handle.Article(html_page, html_uri[:-5].split('/')[-1])
-        article.all_handle()
+            with open(html_uri, 'r', encoding='utf8') as f:
+                html_page = f.read()
 
-        # title, image_url = [], button = False, content = '', video = ''
-        title = df.iloc[int(html_uri[:-5].split('/')[-1])]['title']
-        image_url = [{'url': 'https://cdn.kingmasports.com/'+spider.picture_post(img_uri+article.img_kind,
-                                                                                  article.img_kind)}]
-        print(image_url)
-        content = article.content.prettify()
-        video = ''
-        spider.create_article(title=title, image_url=image_url, button=button, content=content, video=video)
+            article = article_handle.Article(html_page, html_uri[:-5].split('/')[-1])
+            article.all_handle()
+
+            # title, image_url = [], button = False, content = '', video = ''
+            title = df.iloc[int(html_uri[:-5].split('/')[-1])]['title']
+            image_url = [{'url': 'https://cdn.kingmasports.com/'+spider.picture_post(img_uri+article.img_kind,
+                                                                                      article.img_kind)}]
+
+            content = article.content.prettify()
+            video = ''
+            spider.create_article(title=title, image_url=image_url, button=button, content=content, video=video)
+        except Exception as e:
+            print('Error: ', e)
 
     return render_template('report.html')
 
 
 if __name__ == '__main__':
-    # url_ = 'https://news.163.com/'
-    # file_name = 'df_test'
-    # spider.home_spider(url_, file_name)
+    aim = ['https://news.163.com/', 'https://news.163.com/world/', 'https://news.163.com/domestic/',
+           'https://tech.163.com/', 'https://sports.163.com/', 'https://ent.163.com/']
+    url_ = aim[0]
+    file_name = 'df_test'
+    spider.home_spider(url_, file_name)
     app.run()

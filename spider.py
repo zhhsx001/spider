@@ -1,6 +1,7 @@
 import base64
 import os
 import shutil
+import time
 from io import BytesIO
 import requests
 from selenium import webdriver
@@ -10,7 +11,7 @@ import pandas as pd
 
 
 url = 'https://news.163.com/'
-aim = ['abcd.html', 'domestic.html', 'world.html', 'tech.html', 'jiankang.html']
+aim = ['https://news.163.com/', 'domestic.html', 'world.html', 'tech.html', 'jiankang.html']
 token_url = 'http://admin.kingmasports.com/admapi/v1/store/qiniu/uploadToken?upMode=base64&uid=9'
 post_url = "https://upload-z1.qiniup.com/putb64/-1/key/"
 
@@ -19,6 +20,8 @@ def home_spider(url_, file_name):
     browser = webdriver.Chrome()
     try:
         browser.get(url_)
+        time.sleep(5)
+        scroll(browser)
         home_soup = BeautifulSoup(browser.page_source, 'lxml')
         article_list = home_soup.find_all(class_="data_row news_article clearfix")
         string = pd.DataFrame(columns=['url', 'title', 'img', 'time', 'keywords'])
@@ -27,7 +30,8 @@ def home_spider(url_, file_name):
             one_title = pd.Series(index=['url', 'title', 'img', 'time', 'keywords'])
             one_title['url'] = article.a['href']
             one_title['title'] = article.h3.string
-            one_title['img'] = article.img['src']
+            if article.img:
+                one_title['img'] = article.img['src']
             one_title['time'] = article.span.string
             article_keywords = ''
 
@@ -35,7 +39,7 @@ def home_spider(url_, file_name):
             try:
                 for a in keywords.find_all('a'):
                     article_keywords += ' ' + a.string
-            except None:
+            except:
                 continue
             one_title['keywords'] = keywords
             string = string.append(one_title, ignore_index=True)
@@ -50,6 +54,28 @@ def home_spider(url_, file_name):
     os.mkdir('new/small')
 
 
+def scroll(driver):
+    driver.execute_script(""" 
+        (function () { 
+            var y = document.body.scrollTop; 
+            var step = 100; 
+            window.scroll(0, y); 
+            function f() { 
+                if (y < document.body.scrollHeight) { 
+                    y += step; 
+                    window.scroll(0, y); 
+                    setTimeout(f, 50); 
+                }
+                else { 
+                    window.scroll(0, y); 
+                    document.title += "scroll-done"; 
+                } 
+            } 
+            setTimeout(f, 1000); 
+        })(); 
+        """)
+
+
 def big_and_small_spilt():
     choices = pd.read_csv('choices.csv', index_col=0, header=None)
     data = pd.read_csv('df_test.csv', index_col=0)
@@ -60,14 +86,17 @@ def big_and_small_spilt():
 
 def html_spider(url_id, url_):
     # 根据选取的列表，爬取对应的new，根据有大图，无大图分成两组存储。
+
     request = requests.get(url_)
     soup = BeautifulSoup(request.text, 'lxml')
+
     text = soup.body.find(class_="post_content post_area clearfix").find(id="epContentLeft").find(class_="post_body").\
         find(id="endText")
 
     mark = 'small'
     tap = text.find(class_='ep-source cDGray')
-    tap.extract()
+    if tap:
+        tap.extract()
     img = text.img
     if img:
         mark = 'big'
@@ -123,9 +152,6 @@ def picture_post(picture_url, img_kind):
     base64_str = base64.b64encode(byte_data)
     response = requests.post(post_u, headers=post_headers, data=base64_str)
 
-    print('---post picture:')
-    print(response.status_code)
-    print(response.text)
     picture_id = response.json()['key']
     return picture_id
     # 或者上传所有文字后，根据标题选择对应的图片上传。selenium
@@ -165,8 +191,10 @@ def create_article(title, image_url=[], button=False, content='', video=''):
 
     r = requests.post(create_url, headers=headers, json=article)
     print('create article')
-    print(r.status_code)
-    print(r.text)
+    try:
+        print('json: ', r.json()['msg'])
+    except:
+        print('text: ', r.json())
 
 
 if __name__ == "__main__":
