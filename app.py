@@ -1,9 +1,11 @@
 import os
+import time
 from flask import Flask, url_for, render_template, request, flash, redirect
 from bs4 import BeautifulSoup
 import pandas as pd
 import spider
 import article_handle
+
 app = Flask(__name__)
 
 
@@ -20,7 +22,6 @@ def show_title():
 def accept_title():
     result = []
     for key in request.form.keys():
-
         result.append(key)
     result = pd.Series(result)
 
@@ -33,6 +34,7 @@ def report():
     spider.big_and_small_spilt()
     big_html = os.listdir('new/big')
     small_html = os.listdir('new/small')
+
     df = pd.read_csv('df_test.csv')
 
     for i in range(30):
@@ -56,21 +58,23 @@ def report():
 
             with open(html_uri, 'r', encoding='utf8') as f:
                 html_page = f.read()
-
             article = article_handle.Article(html_page, html_uri[:-5].split('/')[-1])
-            article.all_handle()
-
-            # title, image_url = [], button = False, content = '', video = ''
+            text = article.all_handle()
+            if text is None:
+                continue
             title = df.iloc[int(html_uri[:-5].split('/')[-1])]['title']
-            image_url = [{'url': 'https://cdn.kingmasports.com/'+spider.picture_post(img_uri+article.img_kind,
-                                                                                      article.img_kind)}]
-
-            content = article.content.prettify()
-            video = ''
+            image_url = [{'url': 'https://cdn.kingmasports.com/' + spider.picture_post(img_uri + article.img_kind,
+                                                                                       article.img_kind)}]
+            content = text
+            if article.video_url:
+                video = '"<iframe frameborder="0" src="' + article.video_url + '" width="100%"></iframe>"'
+            else:
+                video = ''
             spider.create_article(title=title, image_url=image_url, button=button, content=content, video=video)
         except Exception as e:
-            print('Error: ', e)
-
+            print(e)
+        finally:
+            time.sleep(0.1)
     return render_template('report.html')
 
 
