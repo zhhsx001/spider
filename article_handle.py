@@ -12,7 +12,8 @@ class Article(object):
         self.video_url = ''
         self.html = BeautifulSoup(html, 'lxml')
         # content/text 位于p StartFragment与 p EndFragment之间
-        self.content = self.html.body.find(id="endText")
+        self.content = self.html.find(id="endText")
+
 
     def no_kind(self):
         # 报错跳过，
@@ -77,7 +78,8 @@ class Article(object):
     def del_editor(self):
         # 删除文脚编辑，文章内容编辑。
         tap = self.content.find(class_='ep-source cDGray')
-        tap.extract()
+        if tap:
+            tap.extract()
 
     def add_editor(self):
         # 定位文章内容，删除页脚责编，增加诸黎。
@@ -85,10 +87,10 @@ class Article(object):
         p_list[-1].string = '编辑诸黎'
 
     def del_blank(self):
-        # 删除空行
         for tap in self.content:
-            if tap.string is None:
-                tap.extract()
+            if tap:
+                if tap.string is None:
+                    tap.extract()
 
     def save_img(self):
         tap_img = self.content.find('img', recursive=True)
@@ -100,8 +102,8 @@ class Article(object):
             with open('new/big/'+self.id+'p.'+img_url.split('.')[-1].split('?')[0], 'wb') as f:
                 f.write(img.content)
         else:
-            print('htmlid: ', self.id)
             img_url = pd.read_csv('df_test.csv').iloc[int(self.id)]['img']
+
             img = requests.get(img_url)
             with open('new/small/'+self.id+'p.'+img_url.split('.')[-1].split('?')[0], 'wb') as f:
                 f.write(img.content)
@@ -123,6 +125,8 @@ class Article(object):
         if self.no_kind():
             return None
         self.old_title()
+        self.video()
+        self.del_link()
         self.del_editor()
         self.save_img()
         # self.video()
