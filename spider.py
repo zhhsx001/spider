@@ -7,6 +7,7 @@ from selenium import webdriver
 from PIL import Image
 from bs4 import BeautifulSoup
 import pandas as pd
+import article_handle
 
 
 url = 'https://news.163.com/'
@@ -24,6 +25,8 @@ def home_spider(url_, file_name):
         string = pd.DataFrame(columns=['url', 'title', 'img', 'time', 'keywords'])
 
         for article in article_list:
+            if article.img is None:
+                continue
             one_title = pd.Series(index=['url', 'title', 'img', 'time', 'keywords'])
             one_title['url'] = article.a['href']
             one_title['title'] = article.h3.string
@@ -35,7 +38,7 @@ def home_spider(url_, file_name):
             try:
                 for a in keywords.find_all('a'):
                     article_keywords += ' ' + a.string
-            except None:
+            except:
                 continue
             one_title['keywords'] = keywords
             string = string.append(one_title, ignore_index=True)
@@ -44,21 +47,25 @@ def home_spider(url_, file_name):
     finally:
         browser.close()
 
-    shutil.rmtree('new/big')
-    os.mkdir('new/big')
-    shutil.rmtree('new/small')
-    os.mkdir('new/small')
-
 
 def big_and_small_spilt():
     choices = pd.read_csv('choices.csv', index_col=0, header=None)
     data = pd.read_csv('df_test.csv', index_col=0)
+    shutil.rmtree('new/big')
+    os.mkdir('new/big')
+    shutil.rmtree('new/small')
+    os.mkdir('new/small')
     for url_id in choices[1]:
         url_ = data.loc[url_id, 'url']
         html_spider(url_id, url_)
 
 
+def report():
+    pass
+
+
 def html_spider(url_id, url_):
+    print(url_)
     # 根据选取的列表，爬取对应的new，根据有大图，无大图分成两组存储。
     request = requests.get(url_)
     soup = BeautifulSoup(request.text, 'lxml')
@@ -67,8 +74,9 @@ def html_spider(url_id, url_):
 
     mark = 'small'
     tap = text.find(class_='ep-source cDGray')
-    tap.extract()
-    img = text.img
+    if tap:
+        tap.extract()
+    img = text.find('img')
     if img:
         mark = 'big'
 
@@ -165,8 +173,46 @@ def create_article(title, image_url=[], button=False, content='', video=''):
 
     r = requests.post(create_url, headers=headers, json=article)
     print('create article')
-    print(r.status_code)
-    print(r.text)
+    print(r.json['msg'])
+
+
+def report():
+    big_html = os.listdir('new/big')
+    small_html = os.listdir('new/small')
+
+    df = pd.read_csv('df_test.csv')
+    print('the last number: ', df.count()[0])
+    for i in range(df.count()[0]):
+        # 处理比例不平衡条件。
+        if i % 3 == 0 and big_html:
+            html_uri = big_html.pop()
+            img_uri = 'new/big/' + html_uri[:-5] + 'p.'
+            button = True
+            html_uri = 'new/big/' + html_uri
+        elif small_html:
+            html_uri = small_html.pop()
+            img_uri = 'new/small/' + html_uri[:-5] + 'p.'
+            button = False
+            html_uri = 'new/small/' + html_uri
+        else:
+            html_uri = big_html.pop()
+            img_uri = 'new/big/' + html_uri[:-5] + 'p.'
+            button = False
+            html_uri = 'new/big/' + html_uri
+
+        with open(html_uri, 'r', encoding='utf8') as f:
+            html_page = f.read()
+        article = article_handle.Article(html_page, html_uri[:-5].split('/')[-1])
+        text = article.all_handle()
+        if text is None:
+            continue
+        title = df.iloc[int(html_uri[:-5].split('/')[-1])]['title']
+        image_url = [{'url': 'https://cdn.kingmasports.com/' + picture_post(img_uri + article.img_kind,
+                                                                            article.img_kind)}]
+        # print(image_url)
+        content = text
+        video = ''
+        create_article(title=title, image_url=image_url, button=button, content=content, video=video)
 
 
 if __name__ == "__main__":
